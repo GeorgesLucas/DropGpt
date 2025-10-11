@@ -3,7 +3,10 @@ const axios = require("axios");
 const bodyParser = require("body-parser");
 
 const app = express();
+
+// Accepte JSON et x-www-form-urlencoded
 app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
 const DROPBOX_TOKEN = process.env.DROPBOX_TOKEN;
 const RPC_URL = "https://api.dropboxapi.com/2";
@@ -13,11 +16,11 @@ const CONTENT_URL = "https://content.dropboxapi.com/2";
 function sanitizePath(p) {
   if (typeof p !== "string") return p;
   let s = p;
-  // 1️⃣ Remplace les espaces insécables
+  // Remplace les espaces insécables
   s = s.replace(/\u00A0/g, " ");
-  // 2️⃣ Supprime les espaces juste avant un point
+  // Supprime les espaces juste avant un point (ex: "test .txt" -> "test.txt")
   s = s.replace(/\s+(?=\.)/g, "");
-  // 3️⃣ Supprime les espaces en début et fin
+  // Trim début/fin
   s = s.trim();
   return s;
 }
@@ -29,11 +32,18 @@ app.post("/list", async (req, res) => {
     const response = await axios.post(
       `${RPC_URL}/files/list_folder`,
       { path, recursive: false },
-      { headers: { Authorization: `Bearer ${DROPBOX_TOKEN}` } }
+      {
+        headers: {
+          Authorization: `Bearer ${DROPBOX_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
     );
     res.json(response.data);
   } catch (err) {
-    res.status(500).json({ error: err.response?.data || err.message });
+    res
+      .status(500)
+      .json({ error: err.response?.data || err.message || "Unknown error" });
   }
 });
 
@@ -44,11 +54,18 @@ app.post("/list/continue", async (req, res) => {
     const response = await axios.post(
       `${RPC_URL}/files/list_folder/continue`,
       { cursor },
-      { headers: { Authorization: `Bearer ${DROPBOX_TOKEN}` } }
+      {
+        headers: {
+          Authorization: `Bearer ${DROPBOX_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
     );
     res.json(response.data);
   } catch (err) {
-    res.status(500).json({ error: err.response?.data || err.message });
+    res
+      .status(500)
+      .json({ error: err.response?.data || err.message || "Unknown error" });
   }
 });
 
@@ -58,18 +75,22 @@ app.post("/download", async (req, res) => {
     const path = sanitizePath(req.body.path);
     const response = await axios.post(
       `${CONTENT_URL}/files/download`,
-      null,
+      null, // body vide
       {
         headers: {
           Authorization: `Bearer ${DROPBOX_TOKEN}`,
-          "Dropbox-API-Arg": JSON.stringify({ path })
+          "Dropbox-API-Arg": JSON.stringify({ path }),
+          // Certains connecteurs envoient urlencoded; on force un content-type simple attendu par Dropbox
+          "Content-Type": "text/plain; charset=utf-8"
         },
         responseType: "arraybuffer"
       }
     );
     res.json({ content: Buffer.from(response.data).toString("base64") });
   } catch (err) {
-    res.status(500).json({ error: err.response?.data || err.message });
+    res
+      .status(500)
+      .json({ error: err.response?.data || err.message || "Unknown error" });
   }
 });
 
@@ -91,7 +112,9 @@ app.post("/upload", async (req, res) => {
     });
     res.json(response.data);
   } catch (err) {
-    res.status(500).json({ error: err.response?.data || err.message });
+    res
+      .status(500)
+      .json({ error: err.response?.data || err.message || "Unknown error" });
   }
 });
 
