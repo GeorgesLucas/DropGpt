@@ -9,14 +9,15 @@ const DROPBOX_TOKEN = process.env.DROPBOX_TOKEN;
 const RPC_URL = "https://api.dropboxapi.com/2";
 const CONTENT_URL = "https://content.dropboxapi.com/2";
 
-// --- utils: nettoyage des chemins ---
+// --- Fonction universelle de nettoyage des chemins ---
 function sanitizePath(p) {
   if (typeof p !== "string") return p;
-  // Remplace les espaces insécables par des espaces classiques
-  let s = p.replace(/\u00A0/g, " ");
-  // Supprime les espaces juste avant un point (ex: "test .txt" -> "test.txt")
+  let s = p;
+  // 1️⃣ Remplace les espaces insécables
+  s = s.replace(/\u00A0/g, " ");
+  // 2️⃣ Supprime les espaces juste avant un point
   s = s.replace(/\s+(?=\.)/g, "");
-  // Trim début/fin (sans toucher aux espaces internes)
+  // 3️⃣ Supprime les espaces en début et fin
   s = s.trim();
   return s;
 }
@@ -57,7 +58,7 @@ app.post("/download", async (req, res) => {
     const path = sanitizePath(req.body.path);
     const response = await axios.post(
       `${CONTENT_URL}/files/download`,
-      null, // body vide
+      null,
       {
         headers: {
           Authorization: `Bearer ${DROPBOX_TOKEN}`,
