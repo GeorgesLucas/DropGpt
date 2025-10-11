@@ -28,7 +28,7 @@ app.post("/download", async (req, res) => {
   try {
     const response = await axios.post(
       `${CONTENT_URL}/files/download`,
-      { path: req.body.path },
+      null, // <= body vide !
       {
         headers: {
           Authorization: `Bearer ${DROPBOX_TOKEN}`,
