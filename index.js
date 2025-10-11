@@ -3,6 +3,8 @@ const axios = require("axios");
 const bodyParser = require("body-parser");
 
 const app = express();
+
+// Accepte JSON et x-www-form-urlencoded
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -13,12 +15,12 @@ const CONTENT_URL = "https://content.dropboxapi.com/2";
 // --- Fonction universelle de nettoyage + log ---
 function sanitizePath(p) {
   if (typeof p !== "string") return p;
-  let original = p;
+  const original = p;
   let s = p
-    .replace(/\u00A0/g, " ")     // remplace les espaces insécables
-    .replace(/\s+(?=\.)/g, "")   // supprime les espaces avant un point
-    .replace(/\s{2,}/g, " ")     // supprime les espaces doubles
-    .trim();                     // supprime début/fin
+    .replace(/\u00A0/g, " ")   // remplace NBSP par espace normal
+    .replace(/\s+(?=\.)/g, "") // supprime les espaces juste avant un point
+    .replace(/\s{2,}/g, " ")   // compresse les espaces multiples
+    .trim();                   // trim début/fin
   if (s !== original) {
     console.log(`[sanitizePath] Reçu: "${original}" → Corrigé: "${s}"`);
   } else {
@@ -27,7 +29,7 @@ function sanitizePath(p) {
   return s;
 }
 
-// Route test
+// Ping simple
 app.get("/", (req, res) => res.send("✅ DropGPT middleware actif"));
 
 // Lister un dossier
@@ -46,11 +48,11 @@ app.post("/list", async (req, res) => {
     );
     res.json(response.data);
   } catch (err) {
-    res.status(500).json({ error: err.response?.data || err.message });
+    res.status(500).json({ error: err.response?.data || err.message || "Unknown error" });
   }
 });
 
-// Continuer pagination
+// Continuer la pagination
 app.post("/list/continue", async (req, res) => {
   try {
     const cursor = req.body.cursor;
@@ -66,7 +68,7 @@ app.post("/list/continue", async (req, res) => {
     );
     res.json(response.data);
   } catch (err) {
-    res.status(500).json({ error: err.response?.data || err.message });
+    res.status(500).json({ error: err.response?.data || err.message || "Unknown error" });
   }
 });
 
@@ -76,7 +78,7 @@ app.post("/download", async (req, res) => {
     const path = sanitizePath(req.body.path);
     const response = await axios.post(
       `${CONTENT_URL}/files/download`,
-      null,
+      null, // body vide
       {
         headers: {
           Authorization: `Bearer ${DROPBOX_TOKEN}`,
@@ -86,9 +88,12 @@ app.post("/download", async (req, res) => {
         responseType: "arraybuffer"
       }
     );
-    res.json({ content: Buffer.from(response.data).toString("base64") });
+    res.json({
+      normalizedPath: path, // <- pour vérifier côté client
+      content: Buffer.from(response.data).toString("base64")
+    });
   } catch (err) {
-    res.status(500).json({ error: err.response?.data || err.message });
+    res.status(500).json({ error: err.response?.data || err.message || "Unknown error" });
   }
 });
 
@@ -108,11 +113,16 @@ app.post("/upload", async (req, res) => {
         })
       }
     });
-    res.json(response.data);
+    res.json({
+      normalizedPath: path, // <- pour vérifier côté client
+      ...response.data
+    });
   } catch (err) {
-    res.status(500).json({ error: err.response?.data || err.message });
+    res.status(500).json({ error: err.response?.data || err.message || "Unknown error" });
   }
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Middleware listening on port ${port}`));
+app.listen(port, () => {
+  console.log(`Middleware listening on port ${port}`);
+});
